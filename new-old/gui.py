@@ -49,18 +49,18 @@ def crop_to_tiles(img: Image.Image, cols: int, rows: int) -> Image.Image:
 
 
 # ─────────────────────────────────────────────
-#  Zoomable image viewer
+#  Zoomable viewer
 # ─────────────────────────────────────────────
 
 class ZoomableLabel(QWidget):
     def __init__(self, placeholder=""):
         super().__init__()
-        self.pixmap      = None
-        self.zoom        = 1.0
-        self.offset      = QPointF(0, 0)
-        self._drag_start        = None
-        self._drag_offset_start = None
-        self._placeholder       = placeholder
+        self.pixmap               = None
+        self.zoom                 = 1.0
+        self.offset               = QPointF(0, 0)
+        self._drag_start          = None
+        self._drag_offset_start   = None
+        self._placeholder         = placeholder
         self.setMinimumSize(256, 256)
         self.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Expanding)
         self.setStyleSheet("background: #1a1a1a; border: 1px solid #333;")
@@ -169,18 +169,18 @@ class DropZone(QLabel):
 
 
 # ─────────────────────────────────────────────
-#  Worker thread
+#  Worker
 # ─────────────────────────────────────────────
 
 class GenerateWorker(QThread):
-    progress = pyqtSignal(int, int, int, float)   # tc, tr, col, cost
-    finished = pyqtSignal(object, object, object) # rendered, blocks, heights
+    progress = pyqtSignal(int, int, int, float)
+    finished = pyqtSignal(object, object, object)
     error    = pyqtSignal(str)
 
     def __init__(self, tiles, height_penalty, dither_strength):
         super().__init__()
-        self.tiles          = tiles
-        self.height_penalty = height_penalty
+        self.tiles           = tiles
+        self.height_penalty  = height_penalty
         self.dither_strength = dither_strength
 
     def run(self):
@@ -233,8 +233,6 @@ class MainWindow(QMainWindow):
         self.setStyleSheet(DARK_STYLE)
 
         self.source_image   = None
-        self.tiles          = None
-        self.rendered       = None
         self.full_rendered  = None
         self.result_blocks  = None
         self.result_heights = None
@@ -245,13 +243,13 @@ class MainWindow(QMainWindow):
         self._build_ui()
 
     def _build_ui(self):
-        central  = QWidget()
+        central = QWidget()
         self.setCentralWidget(central)
-        root     = QHBoxLayout(central)
+        root = QHBoxLayout(central)
         root.setContentsMargins(8, 8, 8, 8)
         root.setSpacing(8)
 
-        # ── controls (left) ──────────────────
+        # ── controls ─────────────────────────
         controls = QWidget()
         controls.setFixedWidth(220)
         cl = QVBoxLayout(controls)
@@ -281,7 +279,7 @@ class MainWindow(QMainWindow):
         grid_layout.addWidget(self.maps_h, 1, 1)
         cl.addWidget(grid_group)
 
-        # solver settings
+        # solver
         solver_group  = QGroupBox("Solver")
         solver_layout = QGridLayout(solver_group)
         solver_layout.setSpacing(4)
@@ -294,11 +292,17 @@ class MainWindow(QMainWindow):
         self.hp_spin.setToolTip("Higher = flatter, lower = more height variation")
         solver_layout.addWidget(self.hp_spin, 0, 1)
 
-        solver_layout.addWidget(QLabel("Max Height Diff"), 1, 0)
+        solver_layout.addWidget(QLabel("Max Height"), 1, 0)
         self.mh_spin = QSpinBox()
         self.mh_spin.setRange(0, 16)
         self.mh_spin.setValue(4)
         solver_layout.addWidget(self.mh_spin, 1, 1)
+
+        solver_layout.addWidget(QLabel("Max Step"), 1, 0)
+        self.ms_spin = QSpinBox()
+        self.ms_spin.setRange(0, 16)
+        self.ms_spin.setValue(4)
+        solver_layout.addWidget(self.ms_spin, 1, 1)
 
         solver_layout.addWidget(QLabel("Beam Width"), 2, 0)
         self.bw_spin = QSpinBox()
@@ -311,8 +315,8 @@ class MainWindow(QMainWindow):
         self.dither_spin = QDoubleSpinBox()
         self.dither_spin.setRange(0.0, 1.0)
         self.dither_spin.setSingleStep(0.05)
-        self.dither_spin.setValue(0.3)
-        self.dither_spin.setToolTip("0 = off, 0.5 = full. Lower reduces artifacts")
+        self.dither_spin.setValue(0.2)
+        self.dither_spin.setToolTip("0 = off, higher = more dithering (may cause artifacts)")
         solver_layout.addWidget(self.dither_spin, 3, 1)
 
         self.flip_h = QCheckBox("Flip Horizontal")
@@ -357,18 +361,18 @@ class MainWindow(QMainWindow):
         cl.addWidget(export_group)
         cl.addStretch()
 
-        # ── viewers (right) ──────────────────
+        # ── viewers ──────────────────────────
         view_splitter = QSplitter(Qt.Horizontal)
         root.addWidget(view_splitter, stretch=1)
 
-        in_group  = QGroupBox("Input  (scroll=zoom, drag=pan, dblclick=fit)")
+        in_group  = QGroupBox("Input  (scroll=zoom  drag=pan  dblclick=fit)")
         in_layout = QVBoxLayout(in_group)
         in_layout.setContentsMargins(4, 16, 4, 4)
         self.input_viewer = ZoomableLabel("Drop an image to begin")
         in_layout.addWidget(self.input_viewer)
         view_splitter.addWidget(in_group)
 
-        out_group  = QGroupBox("Preview  (scroll=zoom, drag=pan, dblclick=fit)")
+        out_group  = QGroupBox("Preview  (scroll=zoom  drag=pan  dblclick=fit)")
         out_layout = QVBoxLayout(out_group)
         out_layout.setContentsMargins(4, 16, 4, 4)
         self.output_viewer = ZoomableLabel("Preview will appear here")
@@ -420,7 +424,6 @@ class MainWindow(QMainWindow):
 
         arr = np.array(cropped, dtype=np.float32)
 
-        # split into tiles[tc][tr]
         tiles = []
         for tc in range(mw):
             col_tiles = []
@@ -430,7 +433,6 @@ class MainWindow(QMainWindow):
                 col_tiles.append(arr[y0:y0+128, x0:x0+128, :])
             tiles.append(col_tiles)
 
-        self.tiles      = tiles
         self.total_cols = mw * mh * 128
         self._done_cols = 0
 
@@ -459,7 +461,6 @@ class MainWindow(QMainWindow):
         )
 
     def on_finished(self, rendered, blocks, heights):
-        self.rendered       = rendered
         self.result_blocks  = blocks
         self.result_heights = heights
 
@@ -524,12 +525,11 @@ class MainWindow(QMainWindow):
                 output_path = path,
                 name        = f"Map Art ({tc},{tr})",
             )
-
         self.status_label.setText(f"Saved {len(paths)} schematic(s)")
 
 
 # ─────────────────────────────────────────────
-#  Dark stylesheet
+#  Style
 # ─────────────────────────────────────────────
 
 DARK_STYLE = """
@@ -586,10 +586,9 @@ QCheckBox::indicator {
     border-radius: 2px;
     background: #1a1a1a;
 }
-QCheckBox::indicator:checked  { background: #2d5a8e; border-color: #2d5a8e; }
-QCheckBox::indicator:hover    { border-color: #888; }
+QCheckBox::indicator:checked { background: #2d5a8e; border-color: #2d5a8e; }
+QCheckBox::indicator:hover   { border-color: #888; }
 """
-
 
 if __name__ == "__main__":
     app = QApplication(sys.argv)

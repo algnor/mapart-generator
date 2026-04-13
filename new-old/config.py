@@ -65,6 +65,5 @@ BLOCKS = {
 "verdant_froglight": (127, 167, 150 )    # 61 GLOW_LICHEN 
 }
 
-MAX_HEIGHT = 3
-MAX_STEP   = 2
-BEAM_WIDTH = 32
+MAX_HEIGHT_DIFF = 3
+BEAM_WIDTH      = 16

@@ -51,23 +51,23 @@ def export_sponge(
     data_version: int = 3700,
 ):
     """
-    all_blocks  : [x][z] -> block_idx   (x=image col, z=image row)
-    all_heights : [x][z] -> height
+    all_blocks  : [col][row] -> block_idx
+    all_heights : [col][row] -> height
 
-    Schematic axes:
-      X = image col  (WIDTH  = 128)
+    Axes:
+      X = image col   (WIDTH  = 128)
       Y = height
-      Z = image row  (LENGTH = 128)
+      Z = image row   (LENGTH = 128)
       flat index = x + z*Width + y*Width*Length
     """
-    n_x   = len(all_blocks)
-    n_z   = len(all_blocks[0])
-    min_h = min(h for col in all_heights for h in col)
-    max_h = max(h for col in all_heights for h in col)
+    n_cols = len(all_blocks)
+    n_rows = len(all_blocks[0])
+    min_h  = min(h for col in all_heights for h in col)
+    max_h  = max(h for col in all_heights for h in col)
 
-    WIDTH  = n_x
+    WIDTH  = n_cols
     HEIGHT = max_h - min_h + 1
-    LENGTH = n_z
+    LENGTH = n_rows
 
     mc_names    = [_solver_name_to_mc(n) for n in BLOCK_NAMES]
     palette_map = {"minecraft:air": 0}
@@ -76,11 +76,10 @@ def export_sponge(
             palette_map[mc] = len(palette_map)
 
     flat = np.zeros(WIDTH * HEIGHT * LENGTH, dtype=np.int32)
-    for x, (blk_col, h_col) in enumerate(zip(all_blocks, all_heights)):
-        for z, (b, h) in enumerate(zip(blk_col, h_col)):
+    for z, (blk_col, h_col) in enumerate(zip(all_blocks, all_heights)):
+        for x, (b, h) in enumerate(zip(blk_col, h_col)):
             y = h - min_h
             flat[x + z * WIDTH + y * WIDTH * LENGTH] = palette_map[mc_names[b]]
-
 
     nbt_palette = Compound({k: Int(v) for k, v in palette_map.items()})
     block_data  = _encode_varint_array(flat)
