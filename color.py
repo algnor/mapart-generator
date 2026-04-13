@@ -34,9 +34,24 @@ def cie94_batch(lab1: np.ndarray, lab2: np.ndarray) -> np.ndarray:
     dH2 = np.maximum(
         (lab1[:, 1] - lab2[1])**2 + (lab1[:, 2] - lab2[2])**2 - dC**2, 0.0
     )
-    SC = 1.0 + 0.045 * C1
-    SH = 1.0 + 0.015 * C1
+    SC = 1.0 + 0.045 * (C1 + C2) / 2
+    SH = 1.0 + 0.015 * (C1 + C2) / 2
     return np.sqrt(dL**2 + (dC/SC)**2 + dH2/SH**2)
+
+def cie94_batch_multi(lab1: np.ndarray, lab2: np.ndarray) -> np.ndarray:
+    """lab1: (N, 3), lab2: (M, 3) -> (M, N) CIE94 distances"""
+    # lab1 is the palette (N_BLOCKS), lab2 is the query points (beam paths)
+    dL  = lab1[None, :, 0] - lab2[:, None, 0]          # (M, N)
+    C1  = np.sqrt(lab1[None, :, 1]**2 + lab1[None, :, 2]**2)   # (1, N)
+    C2  = np.sqrt(lab2[:, 1]**2 + lab2[:, 2]**2)[:, None]      # (M, 1)
+    dC  = C1 - C2                                       # (M, N)
+    dH2 = np.maximum(
+        (lab1[None, :, 1] - lab2[:, None, 1])**2 +
+        (lab1[None, :, 2] - lab2[:, None, 2])**2 - dC**2, 0.0
+    )
+    SC = 1.0 + 0.045 * (C1 + C2) / 2
+    SH = 1.0 + 0.015 * (C1 + C2) / 2
+    return np.sqrt(dL**2 + (dC / SC)**2 + dH2 / SH**3) # (M, N)
 
 
 def precompute_shaded():
