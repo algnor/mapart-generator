@@ -15,10 +15,11 @@ class ZoomableLabel(QWidget):
         self.setMinimumSize(256, 256)
         self.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Expanding)
         self.setStyleSheet("background: #1a1a1a; border: 1px solid #333;")
+        self.synced: list[ZoomableLabel] = []
+
 
     def set_pixmap(self, pixmap: QPixmap):
         self.pixmap = pixmap
-        self.fit()
         self.update()
 
     def fit(self):
@@ -32,6 +33,7 @@ class ZoomableLabel(QWidget):
             (self.width()  - self.pixmap.width()  * self.zoom) / 2,
             (self.height() - self.pixmap.height() * self.zoom) / 2,
         )
+        self.sync_linked_viewers()
 
     def paintEvent(self, _):
         from PyQt5.QtCore import QRectF
@@ -58,16 +60,20 @@ class ZoomableLabel(QWidget):
         self.offset = cursor - (cursor - self.offset) * (new_zoom / self.zoom)
         self.zoom   = new_zoom
         self.update()
+        self.sync_linked_viewers()
+
 
     def mousePressEvent(self, e):
         if e.button() == Qt.LeftButton:
             self._drag_start        = QPointF(e.pos())
             self._drag_offset_start = QPointF(self.offset)
 
+
     def mouseMoveEvent(self, e):
         if self._drag_start is not None:
             self.offset = self._drag_offset_start + QPointF(e.pos()) - self._drag_start
             self.update()
+            self.sync_linked_viewers()
 
     def mouseReleaseEvent(self, e):
         self._drag_start = None
@@ -78,6 +84,14 @@ class ZoomableLabel(QWidget):
 
     def resizeEvent(self, e):
         self.fit()
+    
+    def sync_linked_viewers(self):
+        for viewer in self.synced:
+            viewer.offset = self.offset
+            viewer.zoom = self.zoom
+            viewer.update()
+
+
 
 
 class DropZone(QLabel):

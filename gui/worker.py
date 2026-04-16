@@ -1,5 +1,8 @@
 import numpy as np
 from PyQt5.QtCore import QThread, pyqtSignal
+from color import tonemap
+import config
+from fs_predither import fs_predither
 from solver import solve_strip
 from renderer import render_strip
 
@@ -8,20 +11,31 @@ class GenerateWorker(QThread):
     # col_pixels is the full-height column across all tile rows
     progress = pyqtSignal(int, int, float, np.ndarray)  # tc, col, cost, col_pixels (map_rows*128, 3)
     finished = pyqtSignal(object, object, object)        # blocks, heights, first_shades
+    processed  = pyqtSignal(np.ndarray)   # (H, W, 3) uint8
     error    = pyqtSignal(str)
 
-    def __init__(self, tiles, height_penalty, dither_strength, per_beam_dither):
+    def __init__(self, image, size, height_penalty, dither_strength):
         super().__init__()
-        self.tiles           = tiles           # [tc][tr] -> (128, 128, 3)
+        
+        self.image = image
+        self.size = size
         self.height_penalty  = height_penalty
         self.dither_strength = dither_strength
-        self.per_beam_dither = per_beam_dither
         self._cancel         = False
+
+
 
     def cancel(self):
         self._cancel = True
 
     def run(self):
+        self.dithered = fs_predither(self.image, self.dither_strength)
+        self.processed.emit(self.dithered.clip(0, 255).astype(np.uint8))
+
+        self.tiles = [
+            [self.dithered[tr*128:(tr+1)*128, tc*128:(tc+1)*128, :] for tr in range(self.size[1])]
+            for tc in range(self.size[0])
+        ]
         try:
             map_cols = len(self.tiles)
             map_rows = len(self.tiles[0])
@@ -42,11 +56,14 @@ class GenerateWorker(QThread):
                         for tr in range(map_rows)
                     ], axis=0)
 
+                    rng = np.random.default_rng(tc + col)
+                    strip = strip + rng.uniform(-2.0, 2.0, strip.shape).astype(np.float32)
+                    strip = np.clip(strip, 0, 255)
+
+
                     path, cost, first_shade = solve_strip(
                         strip,
-                        height_penalty  = self.height_penalty,
-                        dither_strength = self.dither_strength,
-                        per_beam_dither = self.per_beam_dither,
+                        height_penalty   = self.height_penalty
                     )
 
                     # split path into per-tile chunks and store

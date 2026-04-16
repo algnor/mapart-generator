@@ -9,8 +9,10 @@ from PyQt5.QtWidgets import (
 )
 from PyQt5.QtCore import Qt
 
+from color import tonemap
 import config
 from export import export_sponge
+from fs_predither import fs_predither
 from gui.widgets import ZoomableLabel, DropZone
 from gui.worker import GenerateWorker
 from gui.style import DARK_STYLE
@@ -54,6 +56,15 @@ class MainWindow(QMainWindow):
         in_layout.addWidget(self.input_viewer)
         view_splitter.addWidget(in_group)
 
+        self.processed_group  = QGroupBox("Processed  (scroll=zoom  drag=pan  dblclick=fit)")
+        processed_layout = QVBoxLayout(self.processed_group)
+        processed_layout.setContentsMargins(4, 16, 4, 4)
+        self.processed_viewer = ZoomableLabel("Processed target image will appear here")
+        processed_layout.addWidget(self.processed_viewer)
+        view_splitter.addWidget(self.processed_group)
+        self.show_processed_ch.toggled.connect(self.processed_group.setVisible)
+        self.processed_group.setVisible(self.show_processed_ch.isChecked())
+
         out_group  = QGroupBox("Preview  (scroll=zoom  drag=pan  dblclick=fit)")
         out_layout = QVBoxLayout(out_group)
         out_layout.setContentsMargins(4, 16, 4, 4)
@@ -61,7 +72,11 @@ class MainWindow(QMainWindow):
         out_layout.addWidget(self.output_viewer)
         view_splitter.addWidget(out_group)
 
-        view_splitter.setSizes([500, 500])
+        view_splitter.setSizes([500, 500, 500])
+
+        self.input_viewer.synced.extend([self.output_viewer, self.processed_viewer])
+        self.processed_viewer.synced.extend([self.input_viewer, self.output_viewer])
+        self.output_viewer.synced.extend([self.input_viewer, self.processed_viewer])
 
     def _build_controls(self) -> QWidget:
         controls = QWidget()
@@ -125,6 +140,9 @@ class MainWindow(QMainWindow):
         self.maps_h.valueChanged.connect(self.update_input_preview)
         layout.addWidget(self.maps_h, 1, 1)
 
+        self.show_processed_ch = QCheckBox("Show processed image")
+        layout.addWidget(self.show_processed_ch, 2, 0, 1, 2)
+
         return group
 
     def _build_solver_group(self) -> QGroupBox:
@@ -134,21 +152,21 @@ class MainWindow(QMainWindow):
 
         layout.addWidget(QLabel("Height Penalty"), 0, 0)
         self.hp_spin = QDoubleSpinBox()
-        self.hp_spin.setRange(0.0, 20.0)
-        self.hp_spin.setSingleStep(0.25)
-        self.hp_spin.setValue(0.5)
+        self.hp_spin.setRange(0.0, 10.0)
+        self.hp_spin.setSingleStep(0.05)
+        self.hp_spin.setValue(0.1)
         self.hp_spin.setToolTip("Higher = flatter, lower = more height variation")
         layout.addWidget(self.hp_spin, 0, 1)
 
         layout.addWidget(QLabel("Max Height"), 1, 0)
         self.mh_spin = QSpinBox()
-        self.mh_spin.setRange(0, 16)
+        self.mh_spin.setRange(0, 128)
         self.mh_spin.setValue(config.MAX_HEIGHT)
         layout.addWidget(self.mh_spin, 1, 1)
 
         layout.addWidget(QLabel("Max Step"), 2, 0)
         self.ms_spin = QSpinBox()
-        self.ms_spin.setRange(0, 16)
+        self.ms_spin.setRange(0, 128)
         self.ms_spin.setValue(config.MAX_STEP)
         layout.addWidget(self.ms_spin, 2, 1)
 
@@ -161,19 +179,42 @@ class MainWindow(QMainWindow):
 
         layout.addWidget(QLabel("Dither Strength"), 4, 0)
         self.dither_spin = QDoubleSpinBox()
-        self.dither_spin.setRange(0.0, 1.0)
+        self.dither_spin.setRange(0.0, 1.5)
         self.dither_spin.setSingleStep(0.05)
-        self.dither_spin.setValue(0.2)
+        self.dither_spin.setValue(1)
         self.dither_spin.setToolTip("0 = off, higher = more dithering (may cause artifacts)")
         layout.addWidget(self.dither_spin, 4, 1)
 
-        self.per_beam_dither = QCheckBox("Per beam Dithering")
-        layout.addWidget(self.per_beam_dither, 5, 0, 1, 2)
+        layout.addWidget(QLabel("Chroma Weight"), 5, 0)
+        self.chroma_spin = QDoubleSpinBox()
+        self.chroma_spin.setRange(0.0, 5.0)
+        self.chroma_spin.setSingleStep(0.05)
+        self.chroma_spin.setValue(config.CHROMA_WEIGHT)
+        self.chroma_spin.setToolTip("This makes the solver prefer a closer chroma match even at the cost of slight lightness error, can help skin tones.")
+        layout.addWidget(self.chroma_spin, 5, 1)
 
         self.flip_h = QCheckBox("Flip Horizontal")
         self.flip_v = QCheckBox("Flip Vertical")
         layout.addWidget(self.flip_h, 6, 0, 1, 2)
         layout.addWidget(self.flip_v, 7, 0, 1, 2)
+
+        layout.addWidget(QLabel("Tonemap Strength"), 8, 0)
+        self.tonemap_strength_spin = QDoubleSpinBox()
+        self.tonemap_strength_spin.setRange(0.0, 5.0)
+        self.tonemap_strength_spin.setSingleStep(0.1)
+        self.tonemap_strength_spin.setValue(config.TONEMAP_STRENGTH)
+        self.tonemap_strength_spin.setToolTip("Tonemap bright colours to try and regain some detail (minecraft colour pallete is very limited for bright colours)")
+        layout.addWidget(self.tonemap_strength_spin, 8, 1)
+
+        layout.addWidget(QLabel("Tonemap Threshold"), 9, 0)
+        self.tonemap_threshold_spin = QSpinBox()
+        self.tonemap_threshold_spin.setRange(0, 255)
+        self.tonemap_threshold_spin.setSingleStep(1)
+        self.tonemap_threshold_spin.setValue(config.TONEMAP_THRESHOLD)
+        self.tonemap_threshold_spin.setToolTip("How bright a pixel needs to be to be tonemapped")
+        layout.addWidget(self.tonemap_threshold_spin, 9, 1)
+
+
 
         return group
 
@@ -214,6 +255,7 @@ class MainWindow(QMainWindow):
         self.save_schem_btn.setEnabled(False)
         self.save_combined_btn.setEnabled(False)
         self.status_label.setText("Image loaded — ready to generate")
+        self.input_viewer.fit()
 
     def update_input_preview(self):
         if self.source_image is None:
@@ -222,6 +264,7 @@ class MainWindow(QMainWindow):
         mh = self.maps_h.value()
         cropped = crop_to_tiles(self.source_image, mw, mh)
         self.input_viewer.set_pixmap(pil_to_qpixmap(cropped))
+        self.input_viewer.fit()
         self.status_label.setText(f"{mw*128}×{mh*128} px  ({mw}×{mh} maps)")
 
     def generate(self):
@@ -234,6 +277,9 @@ class MainWindow(QMainWindow):
         config.MAX_STEP   = self.ms_spin.value()
         config.MAX_HEIGHT = self.mh_spin.value()
         config.BEAM_WIDTH = self.bw_spin.value()
+        config.CHROMA_WEIGHT = self.chroma_spin.value()
+        config.TONEMAP_STRENGTH = self.tonemap_strength_spin.value()
+        config.TONEMAP_THRESHOLD = self.tonemap_threshold_spin.value()
 
         # recompute dh metadata in solver after config change
         import solver
@@ -251,12 +297,14 @@ class MainWindow(QMainWindow):
         if self.flip_v.isChecked():
             cropped = cropped.transpose(Image.FLIP_TOP_BOTTOM)
 
+
         arr = np.array(cropped, dtype=np.float32)
+
+        if config.TONEMAP_STRENGTH:
+            arr = tonemap(arr, config.TONEMAP_THRESHOLD, config.TONEMAP_STRENGTH)
+
         # tiles[tc][tr] -> (128, 128, 3), row=0 is top of image
-        tiles = [
-            [arr[tr*128:(tr+1)*128, tc*128:(tc+1)*128, :] for tr in range(mh)]
-            for tc in range(mw)
-        ]
+
 
         # progress is per map-column: mw * 128 total
         self.total_cols = mw * 128
@@ -275,12 +323,13 @@ class MainWindow(QMainWindow):
         self.status_label.setText("Generating...")
 
         self.worker = GenerateWorker(
-            tiles,
-            height_penalty  = self.hp_spin.value(),
+            arr,
+            (mw, mh),
+            height_penalty  = self.hp_spin.value() / 100,
             dither_strength = self.dither_spin.value(),
-            per_beam_dither = self.per_beam_dither.isChecked(),
         )
         self.worker.progress.connect(self.on_progress)
+        self.worker.processed.connect(self.on_processed)
         self.worker.finished.connect(self.on_finished)
         self.worker.error.connect(self.on_error)
         self.worker.start()
@@ -306,13 +355,21 @@ class MainWindow(QMainWindow):
         # col_pixels is (map_rows*128, 3), index 0 = top of full image
         x  = tc * 128 + col
         self.full_rendered[:, x, :] = col_pixels
-        if self._done_cols % config.PREVIEW_INTERVAL == 0 or self._done_cols == self.total_cols:
+        if (self._done_cols - 1) % config.PREVIEW_INTERVAL == 0 or self._done_cols == self.total_cols:
             self.output_viewer.set_pixmap(ndarray_to_qpixmap(self.full_rendered))
+        
+        if self._done_cols == 1:
+            self.output_viewer.fit()
+    
+    def on_processed(self, image: np.ndarray):
+        self.processed_viewer.set_pixmap(ndarray_to_qpixmap(image))
 
     def on_finished(self, blocks, heights, first_shades):
         self.result_blocks       = blocks
         self.result_heights      = heights
         self.result_first_shades = first_shades
+
+        self.output_viewer.fit()
 
         self.generate_btn.setEnabled(True)
         self.cancel_btn.setEnabled(False)
