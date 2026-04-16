@@ -4,6 +4,7 @@ from color import SHADED_LAB, N_BLOCKS, oklab_dist_batch as dist_batch, rgb_to_o
 
 _DH_RANGE  = np.arange(-config.MAX_STEP, config.MAX_STEP + 1)
 _DH_SHADES = np.where(_DH_RANGE > 0, 2, np.where(_DH_RANGE < 0, 0, 1)).astype(np.int8)
+_DH_COSTS  = np.abs(_DH_RANGE).astype(np.float32)
 _N_DH      = len(_DH_RANGE)
 
 
