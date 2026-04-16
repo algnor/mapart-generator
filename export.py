@@ -30,6 +30,18 @@ def _encode_varint_array(indices: np.ndarray) -> np.ndarray:
     return np.array(out, dtype=np.int8)
 
 
+def _build_palette(mc_names):
+    palette_map = {"minecraft:air": 0}
+    if _SACRIFICIAL_BLOCK not in palette_map:
+        palette_map[_SACRIFICIAL_BLOCK] = len(palette_map)
+    if _SUPPORT_BLOCK not in palette_map:
+        palette_map[_SUPPORT_BLOCK] = len(palette_map)
+    for mc in mc_names:
+        if mc not in palette_map:
+            palette_map[mc] = len(palette_map)
+    return palette_map
+
+
 def _build_flat(all_blocks, all_heights, first_shades, n_x, n_z, palette_map, mc_names):
     """
     Shared logic for building the flat block array.
@@ -94,10 +106,7 @@ def export_sponge(
     n_z = len(all_blocks[0])
 
     mc_names    = [_solver_name_to_mc(n) for n in BLOCK_NAMES]
-    palette_map = {"minecraft:air": 0, _SACRIFICIAL_BLOCK: 1, _SUPPORT_BLOCK: 2}
-    for mc in mc_names:
-        if mc not in palette_map:
-            palette_map[mc] = len(palette_map)
+    palette_map = _build_palette(mc_names)
 
     flat, WIDTH, HEIGHT, LENGTH, _ = _build_flat(
         all_blocks, all_heights, first_shades, n_x, n_z, palette_map, mc_names
@@ -137,10 +146,7 @@ def export_sponge_combined(
                     flat_shades[x] = first_shades[tc][tr][col]
 
     mc_names    = [_solver_name_to_mc(n) for n in BLOCK_NAMES]
-    palette_map = {"minecraft:air": 0, _SACRIFICIAL_BLOCK: 1, _SUPPORT_BLOCK: 2}
-    for mc in mc_names:
-        if mc not in palette_map:
-            palette_map[mc] = len(palette_map)
+    palette_map = _build_palette(mc_names)
 
     flat, WIDTH, HEIGHT, LENGTH, _ = _build_flat(
         flat_blocks, flat_heights, flat_shades, total_x, total_z, palette_map, mc_names
