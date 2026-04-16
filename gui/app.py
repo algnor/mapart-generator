@@ -392,6 +392,8 @@ class MainWindow(QMainWindow):
             self, "Save Preview", "mapart_preview.png", "PNG (*.png)"
         )
         if path:
+            if not path.endswith(".png"):
+                path += ".png"
             Image.fromarray(self.full_rendered).save(path)
             self.status_label.setText(f"Saved → {os.path.basename(path)}")
 
