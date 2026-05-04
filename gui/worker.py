@@ -63,7 +63,7 @@ class GenerateWorker(QThread):
 
                     path, cost, first_shade = solve_strip(
                         strip,
-                        height_penalty   = self.height_penalty
+                        height_penalty = self.height_penalty
                     )
 
                     # split path into per-tile chunks and store

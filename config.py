@@ -53,7 +53,7 @@ BLOCKS = {
 "green_terracotta": (76, 82, 42),           # 49 TERRACOTTA_GREEN
 "red_terracotta": (142, 60, 46),            # 50 TERRACOTTA_RED
 "black_terracotta": (37, 22, 16),           # 51 TERRACOTTA_BLACK
-# "no good alternative": (189, 48, 49)      # 52 CRIMSON_NYLIUM
+"crimson_nylium": (189, 48, 49),            # 52 CRIMSON_NYLIUM (easily farmable)
 "crimson_planks": (148, 63, 97),            # 53 CRIMSON_STEM
 "crimson_hyphae": (92, 25, 29),             # 54 CRIMSON_HYPHAE
 "oxidized_copper": (22, 126, 134),          # 55 WARPED_NYLIUM
@@ -67,7 +67,7 @@ BLOCKS = {
 
 MAX_HEIGHT = 2
 MAX_STEP   = 2
-BEAM_WIDTH = 48
+BEAM_WIDTH = 16
 PREVIEW_INTERVAL = 4
 CHROMA_WEIGHT = 1.0
 TONEMAP_STRENGTH = 1.0

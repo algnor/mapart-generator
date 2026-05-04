@@ -158,13 +158,13 @@ class MainWindow(QMainWindow):
         self.hp_spin.setToolTip("Higher = flatter, lower = more height variation")
         layout.addWidget(self.hp_spin, 0, 1)
 
-        layout.addWidget(QLabel("Max Height"), 1, 0)
+        layout.addWidget(QLabel("Available Y space"), 1, 0)
         self.mh_spin = QSpinBox()
         self.mh_spin.setRange(0, 128)
         self.mh_spin.setValue(config.MAX_HEIGHT)
         layout.addWidget(self.mh_spin, 1, 1)
 
-        layout.addWidget(QLabel("Max Step"), 2, 0)
+        layout.addWidget(QLabel("Max Step Size"), 2, 0)
         self.ms_spin = QSpinBox()
         self.ms_spin.setRange(0, 128)
         self.ms_spin.setValue(config.MAX_STEP)
@@ -193,26 +193,21 @@ class MainWindow(QMainWindow):
         self.chroma_spin.setToolTip("This makes the solver prefer a closer chroma match even at the cost of slight lightness error, can help skin tones.")
         layout.addWidget(self.chroma_spin, 5, 1)
 
-        self.flip_h = QCheckBox("Flip Horizontal")
-        self.flip_v = QCheckBox("Flip Vertical")
-        layout.addWidget(self.flip_h, 6, 0, 1, 2)
-        layout.addWidget(self.flip_v, 7, 0, 1, 2)
-
-        layout.addWidget(QLabel("Tonemap Strength"), 8, 0)
+        layout.addWidget(QLabel("Tonemap Strength"), 6, 0)
         self.tonemap_strength_spin = QDoubleSpinBox()
         self.tonemap_strength_spin.setRange(0.0, 5.0)
         self.tonemap_strength_spin.setSingleStep(0.1)
         self.tonemap_strength_spin.setValue(config.TONEMAP_STRENGTH)
         self.tonemap_strength_spin.setToolTip("Tonemap bright colours to try and regain some detail (minecraft colour pallete is very limited for bright colours)")
-        layout.addWidget(self.tonemap_strength_spin, 8, 1)
+        layout.addWidget(self.tonemap_strength_spin, 6, 1)
 
-        layout.addWidget(QLabel("Tonemap Threshold"), 9, 0)
+        layout.addWidget(QLabel("Tonemap Threshold"), 7, 0)
         self.tonemap_threshold_spin = QSpinBox()
         self.tonemap_threshold_spin.setRange(0, 255)
         self.tonemap_threshold_spin.setSingleStep(1)
         self.tonemap_threshold_spin.setValue(config.TONEMAP_THRESHOLD)
         self.tonemap_threshold_spin.setToolTip("How bright a pixel needs to be to be tonemapped")
-        layout.addWidget(self.tonemap_threshold_spin, 9, 1)
+        layout.addWidget(self.tonemap_threshold_spin, 7, 1)
 
 
 
@@ -292,10 +287,6 @@ class MainWindow(QMainWindow):
         solver._N_DH     = len(solver._DH_RANGE)
 
         cropped = crop_to_tiles(self.source_image, mw, mh)
-        if self.flip_h.isChecked():
-            cropped = cropped.transpose(Image.FLIP_LEFT_RIGHT)
-        if self.flip_v.isChecked():
-            cropped = cropped.transpose(Image.FLIP_TOP_BOTTOM)
 
 
         arr = np.array(cropped, dtype=np.float32)
