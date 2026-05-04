@@ -2,45 +2,41 @@ name: Build
 
 on: [push, workflow_dispatch]
 
+env:
+  PYTHON_VERSION: '3.11'
+  DEPS: nuitka pyqt5 numpy scipy Pillow nbtlib numba
+  NUITKA_FLAGS: >-
+    --mode=onefile
+    --enable-plugin=pyqt5
+    --disable-console
+    --nofollow-import-to=numba
+    --nofollow-import-to=llvmlite
+    --include-package=numba
+    --include-package=llvmlite
+
 jobs:
-  build-windows:
-    runs-on: windows-latest
+  build:
+    strategy:
+      matrix:
+        include:
+          - os: windows-latest
+            artifact: main.exe
+            extra_flags: --assume-yes-for-downloads
+          - os: ubuntu-latest
+            artifact: main.bin
+
+    runs-on: ${{ matrix.os }}
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
         with:
-          python-version: '3.11'
-      - run: pip install nuitka pyqt5 numpy scipy Pillow nbtlib numba
-      - run: python -m nuitka --mode=onefile --enable-plugin=pyqt5 --assume-yes-for-downloads --disable-console main.py
+          python-version: ${{ env.PYTHON_VERSION }}
+      - name: Install Linux dependencies
+        if: runner.os == 'Linux'
+        run: sudo apt-get install -y patchelf ccache
+      - run: pip install ${{ env.DEPS }}
+      - run: python -m nuitka ${{ env.NUITKA_FLAGS }} ${{ matrix.extra_flags }} main.py
       - uses: actions/upload-artifact@v4
         with:
-          name: windows-build
-          path: main.exe
-
-  # build-mac:
-  #   runs-on: macos-latest
-  #   steps:
-  #     - uses: actions/checkout@v4
-  #     - uses: actions/setup-python@v5
-  #       with:
-  #         python-version: '3.11'
-  #     - run: pip install nuitka pyqt5 numpy scipy Pillow nbtlib numba
-  #     - run: python -m nuitka --mode=app --enable-plugin=pyqt5 --disable-console main.py
-  #     - uses: actions/upload-artifact@v4
-  #       with:
-  #         name: mac-build
-  #         path: main.app
-
-  build-linux:
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-python@v5
-        with:
-          python-version: '3.11'
-      - run: pip install nuitka pyqt5 numpy scipy Pillow nbtlib numba
-      - run: python -m nuitka --mode=onefile --enable-plugin=pyqt5 --disable-console main.py
-      - uses: actions/upload-artifact@v4
-        with:
-          name: linux-build
-          path: main.bin
+          name: ${{ matrix.os }}-build
+          path: ${{ matrix.artifact }}
