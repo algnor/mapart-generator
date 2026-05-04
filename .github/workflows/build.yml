@@ -10,26 +10,26 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: '3.11'
-      - run: pip install nuitka pyqt5 numpy scipy Pillow nbtlib
+      - run: pip install nuitka pyqt5 numpy scipy Pillow nbtlib numba
       - run: python -m nuitka --mode=onefile --enable-plugin=pyqt5 --assume-yes-for-downloads --disable-console main.py
       - uses: actions/upload-artifact@v4
         with:
           name: windows-build
           path: main.exe
 
-  build-mac:
-    runs-on: macos-latest
-    steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-python@v5
-        with:
-          python-version: '3.11'
-      - run: pip install nuitka pyqt5 numpy scipy Pillow nbtlib
-      - run: python -m nuitka --mode=app --enable-plugin=pyqt5 --disable-console main.py
-      - uses: actions/upload-artifact@v4
-        with:
-          name: mac-build
-          path: main.app
+  # build-mac:
+  #   runs-on: macos-latest
+  #   steps:
+  #     - uses: actions/checkout@v4
+  #     - uses: actions/setup-python@v5
+  #       with:
+  #         python-version: '3.11'
+  #     - run: pip install nuitka pyqt5 numpy scipy Pillow nbtlib numba
+  #     - run: python -m nuitka --mode=app --enable-plugin=pyqt5 --disable-console main.py
+  #     - uses: actions/upload-artifact@v4
+  #       with:
+  #         name: mac-build
+  #         path: main.app
 
   build-linux:
     runs-on: ubuntu-latest
@@ -38,7 +38,7 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: '3.11'
-      - run: pip install nuitka pyqt5 numpy scipy Pillow nbtlib
+      - run: pip install nuitka pyqt5 numpy scipy Pillow nbtlib numba
       - run: python -m nuitka --mode=onefile --enable-plugin=pyqt5 --disable-console main.py
       - uses: actions/upload-artifact@v4
         with:
