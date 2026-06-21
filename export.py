@@ -43,25 +43,40 @@ def _build_palette(mc_names):
 
 
 def _build_flat(all_blocks, all_heights, first_shades, n_x, n_z, palette_map, mc_names):
-    """
-    Shared logic for building the flat block array.
-    Returns (flat, WIDTH, HEIGHT, LENGTH, min_h)
-    Z=0 = sacrificial row, Z=1..n_z = map blocks.
-    Support blocks are injected at Y-1 for any block in _NEEDS_SUPPORT.
-    """
     sac_heights = []
     for x in range(n_x):
-        h0    = all_heights[x][0]
-        shade = first_shades[x]
+        #first_opaque = next((z for z, b in enumerate(all_blocks[x]) if b != -1), None)
+        first_is_opaque = all_blocks[x][0] == -1
+        if first_is_opaque:
+            sac_heights.append(None)
+            continue
+        h0    = all_heights[x][first_opaque]
+        if first_opaque == 0:
+            shade = first_shades[x]
+        else:
+            ph = all_heights[x][first_opaque - 1]
+            shade = 2 if h0 > ph else (0 if h0 < ph else 1)
         sac_h = h0 - 1 if shade == 2 else (h0 + 1 if shade == 0 else h0)
         sac_heights.append(sac_h)
 
-    # collect all heights including potential support positions
-    all_h_flat = [h for col in all_heights for h in col] + sac_heights
+    all_h_flat = [h for col in all_heights for b, h in zip(col, all_heights[all_heights.index(col)]) if b != -1] \
+        if False else []  # placeholder, build properly below
+
+    all_h_flat = []
     for x, (blk_col, h_col) in enumerate(zip(all_blocks, all_heights)):
         for b, h in zip(blk_col, h_col):
-            if mc_names[b] in _NEEDS_SUPPORT:
+            if b != -1:
+                all_h_flat.append(h)
+        if sac_heights[x] is not None:
+            all_h_flat.append(sac_heights[x])
+    for x, (blk_col, h_col) in enumerate(zip(all_blocks, all_heights)):
+        for b, h in zip(blk_col, h_col):
+            if b != -1 and mc_names[b] in _NEEDS_SUPPORT:
                 all_h_flat.append(h - 1)
+
+    if not all_h_flat:
+        # fully transparent image
+        return np.zeros(1, dtype=np.int32), 1, 1, n_z + 1, 0
 
     min_h = min(all_h_flat)
     max_h = max(all_h_flat)
@@ -74,12 +89,16 @@ def _build_flat(all_blocks, all_heights, first_shades, n_x, n_z, palette_map, mc
 
     # sacrificial row
     for x in range(n_x):
+        if sac_heights[x] is None:
+            continue
         y = sac_heights[x] - min_h
         flat[x + 0 * WIDTH + y * WIDTH * LENGTH] = palette_map[_SACRIFICIAL_BLOCK]
 
     # map blocks + supports
     for x, (blk_col, h_col) in enumerate(zip(all_blocks, all_heights)):
         for z, (b, h) in enumerate(zip(blk_col, h_col)):
+            if b == -1:
+                continue
             mc = mc_names[b]
             y  = h - min_h
             flat[x + (z + 1) * WIDTH + y * WIDTH * LENGTH] = palette_map[mc]
@@ -87,12 +106,10 @@ def _build_flat(all_blocks, all_heights, first_shades, n_x, n_z, palette_map, mc
                 y_sup = y - 1
                 if y_sup >= 0:
                     idx = x + (z + 1) * WIDTH + y_sup * WIDTH * LENGTH
-                    # only place support if that cell is air
                     if flat[idx] == palette_map["minecraft:air"]:
                         flat[idx] = palette_map[_SUPPORT_BLOCK]
 
     return flat, WIDTH, HEIGHT, LENGTH, min_h
-
 
 def export_sponge(
     all_blocks:   list,
@@ -156,13 +173,12 @@ def export_sponge_combined(
     print(f"Saved {output_path}  ({WIDTH}x{HEIGHT}x{LENGTH}, "
           f"{len(palette_map)} palette entries)")
 
-
 def _write_schem(flat, WIDTH, HEIGHT, LENGTH, palette_map, output_path, name, data_version):
     nbt_palette = Compound({k: Int(v) for k, v in palette_map.items()})
     block_data  = _encode_varint_array(flat)
 
-    nbt = File({
-        "Schematic": Compound({
+    nbt = File(
+        Compound({
             "Version":       Int(2),
             "DataVersion":   Int(data_version),
             "Width":         Short(WIDTH),
@@ -178,7 +194,9 @@ def _write_schem(flat, WIDTH, HEIGHT, LENGTH, palette_map, output_path, name, da
                 "Author": String("mapart_generator"),
                 "Date":   nbtlib.Long(int(time.time() * 1000)),
             }),
-        })
-    }, gzipped=True)
-
+        }),
+        gzipped=True,
+    )
+    nbt.root_name = "Schematic"
     nbt.save(output_path)
+

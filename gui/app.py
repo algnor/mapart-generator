@@ -239,7 +239,7 @@ class MainWindow(QMainWindow):
     # ── slots ────────────────────────────────────────────────────────────────
 
     def load_image(self, path: str):
-        self.source_image = Image.open(path).convert("RGB")
+        self.source_image = Image.open(path).convert("RGBA")
         self.drop_zone.setText(os.path.basename(path))
         self.update_input_preview()
         self.generate_btn.setEnabled(True)
@@ -301,7 +301,7 @@ class MainWindow(QMainWindow):
         self.total_cols = mw * 128
         self._done_cols = 0
 
-        self.full_rendered = np.zeros((mh * 128, mw * 128, 3), dtype=np.uint8)
+        self.full_rendered = np.zeros((mh * 128, mw * 128, 4), dtype=np.uint8)
         self._start_time   = time.perf_counter()
 
         self.generate_btn.setEnabled(False)
@@ -351,10 +351,11 @@ class MainWindow(QMainWindow):
         
         if self._done_cols == 1:
             self.output_viewer.fit()
-    
-    def on_processed(self, image: np.ndarray):
-        self.processed_viewer.set_pixmap(ndarray_to_qpixmap(image))
 
+    def on_processed(self, image: np.ndarray):
+        rgba = np.concatenate([image, np.full((*image.shape[:2], 1), 255, dtype=np.uint8)], axis=-1)
+        self.processed_viewer.set_pixmap(ndarray_to_qpixmap(rgba))
+ 
     def on_finished(self, blocks, heights, first_shades):
         self.result_blocks       = blocks
         self.result_heights      = heights
@@ -385,7 +386,7 @@ class MainWindow(QMainWindow):
         if path:
             if not path.endswith(".png"):
                 path += ".png"
-            Image.fromarray(self.full_rendered).save(path)
+            Image.fromarray(self.full_rendered, mode="RGBA").save(path)
             self.status_label.setText(f"Saved → {os.path.basename(path)}")
 
     def save_schematics(self):

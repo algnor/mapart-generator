@@ -185,19 +185,48 @@ def _build_trans_tables(MAX_H, MAX_S, height_penalty):
         trans_count[ph] = ti
     return trans_nh, trans_si, trans_hc, trans_count
 
-
 def solve_strip(strip: np.ndarray, height_penalty: float = 1.0):
+    """
+    strip: (N, 4) RGBA or (N, 3) RGB float32
+    Returns: path [(block_idx, height), ...], total_cost, first_shade
+             block_idx == -1 means transparent (air)
+    """
+    has_alpha = strip.shape[1] == 4
+    if has_alpha:
+        transparent = strip[:, 3] < 128.0
+        strip = strip[:, :3]
+    else:
+        transparent = np.zeros(strip.shape[0], dtype=bool)
+
+    opaque_idx = np.where(~transparent)[0]
+
+    if len(opaque_idx) == 0:
+        return [(-1, 0)] * len(strip), 0.0, 1
+
+    opaque_strip = strip[opaque_idx]
+
+    path_opaque, cost, first_shade = _solve_opaque(opaque_strip, height_penalty)
+
+    # Reinsert transparent pixels as air
+    path = [(-1, 0)] * len(strip)
+    for i, oi in enumerate(opaque_idx):
+        path[oi] = path_opaque[i]
+
+    return path, cost, first_shade
+
+
+def _solve_opaque(strip: np.ndarray, height_penalty: float = 1.0):
+    """Original solve logic, operates only on opaque pixels."""
     N        = strip.shape[0]
     n_blocks = SHADED_LAB.shape[0]
     BW       = config.BEAM_WIDTH
     MAX_H    = config.MAX_HEIGHT
     MAX_S    = config.MAX_STEP
 
-    target_lab = rgb_to_oklab(strip)  # (N, 3)
+    target_lab = rgb_to_oklab(strip)
 
-    # (N, 3, n_blocks)
     t_exp = target_lab[:, None, None, :]
-    pal   = SHADED_LAB.transpose(1, 0, 2)[None, :, :, :]  # (1, 3, n_blocks, 3)
+    pal   = SHADED_LAB.transpose(1, 0, 2)[None, :, :, :]
     diff  = t_exp - pal
     diff[:, :, :, 1] *= config.CHROMA_WEIGHT
     diff[:, :, :, 2] *= config.CHROMA_WEIGHT
@@ -209,7 +238,6 @@ def solve_strip(strip: np.ndarray, height_penalty: float = 1.0):
         block_dists, trans_nh, trans_si, trans_hc, trans_count, BW, MAX_H, n_blocks
     )
 
-    # Backtrack
     path   = []
     shades = []
     idx    = 0
@@ -221,3 +249,4 @@ def solve_strip(strip: np.ndarray, height_penalty: float = 1.0):
     path.reverse()
     shades.reverse()
     return path, float(block_dists[0, 0, 0]), shades[0]
+
