@@ -9,10 +9,13 @@ env:
     --mode=onefile
     --enable-plugin=pyqt5
     --disable-console
-    --nofollow-import-to=numba
-    --nofollow-import-to=llvmlite
+    --noinclude-numba-mode=bytecode
     --include-package=numba
     --include-package=llvmlite
+    --include-package-data=numba
+    --include-package-data=llvmlite
+    --nofollow-import-to=numba.tests
+    --report=build-report.xml
 
 jobs:
   build:
@@ -31,12 +34,24 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: ${{ env.PYTHON_VERSION }}
+
       - name: Install Linux dependencies
         if: runner.os == 'Linux'
         run: sudo apt-get install -y patchelf ccache
+
       - run: pip install ${{ env.DEPS }}
+
       - run: python -m nuitka ${{ env.NUITKA_FLAGS }} ${{ matrix.extra_flags }} main.py
-      - uses: actions/upload-artifact@v4
+
+      - name: Upload binary
+        uses: actions/upload-artifact@v4
         with:
           name: ${{ matrix.os }}-build
           path: ${{ matrix.artifact }}
+
+      - name: Upload build report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ matrix.os }}-report
+          path: build-report.xml

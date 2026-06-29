@@ -45,11 +45,8 @@ def _build_palette(mc_names):
 def _build_flat(all_blocks, all_heights, first_shades, n_x, n_z, palette_map, mc_names):
     sac_heights = []
     for x in range(n_x):
-        #first_opaque = next((z for z, b in enumerate(all_blocks[x]) if b != -1), None)
-        first_is_opaque = all_blocks[x][0] == -1
-        if first_is_opaque:
-            sac_heights.append(None)
-            continue
+        first_opaque = next((z for z, b in enumerate(all_blocks[x]) if b != -1), None)
+
         h0    = all_heights[x][first_opaque]
         if first_opaque == 0:
             shade = first_shades[x]
